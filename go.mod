@@ -1,4 +1,4 @@
-module bngsdk
+module github.com/ESilva15/bngsdk
 
 go 1.22.0
 
