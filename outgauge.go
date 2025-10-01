@@ -1,11 +1,31 @@
 package bngsdk
 
 // More documentation at https://go.beamng.com/protocols.
+// Or at BeamNG/lua/vehicle/protocols/outgauge.lua
+// OG_x buts for flags
+const (
+	OG_SHIFT = 1     // key // N/A
+	OG_CTRL  = 2     // key // N/A
+	OG_TURBO = 8192  // show turbo gauge
+	OG_KM    = 16384 // if not set - user prefers MILES
+	OG_BAR   = 32768 // if not set - user prefers PSI
+)
 
-/* TODO
-   - OG_x Flags
-   - DL_x Flags
-*/
+// DL_x Flags
+const (
+	DL_SHIFT      = 2 ^ 0  // shift light
+	DL_FULLBEAM   = 2 ^ 1  // full beam
+	DL_HANDBRAKE  = 2 ^ 2  // handbrake
+	DL_PITSPEED   = 2 ^ 3  // pit speed limiter // N/A
+	DL_TC         = 2 ^ 4  // tc active or switched off
+	DL_SIGNAL_L   = 2 ^ 5  // left turn signal
+	DL_SIGNAL_R   = 2 ^ 6  // right turn signal
+	DL_SIGNAL_ANY = 2 ^ 7  // shared turn signal // N/A
+	DL_OILWARN    = 2 ^ 8  // oil pressure warning
+	DL_BATTERY    = 2 ^ 9  // battery warning
+	DL_ABS        = 2 ^ 10 // abs active or switched off
+	DL_SPARE      = 2 ^ 11 // N/A
+)
 
 // Outgauge describes the data served by the BeamNG outgauge server
 type Outgauge struct {
