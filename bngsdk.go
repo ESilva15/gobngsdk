@@ -16,7 +16,7 @@ const (
 	UDPPort = 4444
 )
 
-type BNGSDK struct {
+type BeamNGSDK struct {
 	Addr     *net.UDPAddr
 	Conn     *net.UDPConn
 	Buffer   []byte
@@ -41,7 +41,7 @@ func createUDPConnection(ip string, port int) (*net.UDPConn, *net.UDPAddr, error
 }
 
 // ReadData will read new data from the UDP server
-func (sdk *BNGSDK) ReadData() error {
+func (sdk *BeamNGSDK) ReadData() error {
 	// Receive data from the socket
 	n, _, err := sdk.Conn.ReadFromUDP(sdk.Buffer)
 	if err != nil {
@@ -69,19 +69,19 @@ func (sdk *BNGSDK) ReadData() error {
 	return nil
 }
 
-func (sdk *BNGSDK) Close() {
+func (sdk *BeamNGSDK) Close() {
 	_ = sdk.Conn.Close()
 }
 
 // Init initializes a BeamNG SDK struct
-func Init(ip string, port int) (BNGSDK, error) {
+func Init(ip string, port int) (BeamNGSDK, error) {
 	var err error
-	sdk := BNGSDK{}
+	sdk := BeamNGSDK{}
 
 	// Create the connection to the OutGauge server
 	sdk.Conn, sdk.Addr, err = createUDPConnection(ip, port)
 	if err != nil {
-		return BNGSDK{}, err
+		return BeamNGSDK{}, err
 	}
 
 	// Initiate the data variables
