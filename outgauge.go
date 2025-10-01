@@ -1,11 +1,13 @@
 package bngsdk
 
+// More documentation at https://go.beamng.com/protocols.
+
 /* TODO
    - OG_x Flags
    - DL_x Flags
 */
 
-// More documentation at https://go.beamng.com/protocols
+// Outgauge describes the data served by the BeamNG outgauge server
 type Outgauge struct {
 	Time        uint32   // time in milliseconds (to check order)
 	Car         [4]byte  // Car name
@@ -29,8 +31,9 @@ type Outgauge struct {
 	ID          int32    // optional - only if OutGauge ID is specified
 }
 
-func (o *Outgauge) ToMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap creates a map with the data in the Outgauge struct
+func (o *Outgauge) ToMap() map[string]any {
+	return map[string]any{
 		"Time":        o.Time,        // time in milliseconds (to check order)
 		"Car":         o.Car,         // Car name
 		"Flags":       o.Flags,       // Info (see OG_x below)

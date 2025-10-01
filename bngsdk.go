@@ -1,3 +1,5 @@
+// Package bngsdk defines an API to interact with the BeamNG outgauge data in
+// Go
 package bngsdk
 
 import (
@@ -8,8 +10,10 @@ import (
 )
 
 const (
-	UDP_IP   = "127.0.0.1"
-	UDP_PORT = 4444
+	// UDPIP is the IP of the UDP outgauge server
+	UDPIP = "127.0.0.1"
+	// UDPPort is the port of the UDP outgauge server
+	UDPPort = 4444
 )
 
 type BNGSDK struct {
@@ -17,7 +21,7 @@ type BNGSDK struct {
 	Conn     *net.UDPConn
 	Buffer   []byte
 	Data     *Outgauge
-	DataDict map[string]interface{}
+	DataDict map[string]any
 }
 
 func createUDPConnection(ip string, port int) (*net.UDPConn, *net.UDPAddr, error) {
@@ -66,7 +70,7 @@ func (sdk *BNGSDK) ReadData() error {
 }
 
 func (sdk *BNGSDK) Close() {
-	sdk.Conn.Close()
+	_ = sdk.Conn.Close()
 }
 
 // Init initializes a BeamNG SDK struct
