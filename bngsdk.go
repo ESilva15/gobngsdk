@@ -69,8 +69,8 @@ func (sdk *BeamNGSDK) ReadData() error {
 	return nil
 }
 
-func (sdk *BeamNGSDK) Close() {
-	_ = sdk.Conn.Close()
+func (sdk *BeamNGSDK) Close() error {
+	return sdk.Conn.Close()
 }
 
 // Init initializes a BeamNG SDK struct
