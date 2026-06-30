@@ -7,6 +7,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+
+	bngsdk "github.com/ESilva15/gobngsdk"
 )
 
 const (
@@ -262,3 +264,30 @@ func (sdk *BeamNGSDK) HasABSLight() bool {
 }
 
 // DashLights - functions to check if a given dash light is provided [END]
+
+// Flags - functions to check if a given flag is ON [START]
+
+// HasTurbo returns:
+// true if the car has a turbo
+// false if it doesn't
+func (sdk *BeamNGSDK) HasTurbo() bool {
+	return sdk.Data.Flags&bngsdk.OG_TURBO != 0
+}
+
+// Prefers km:
+// true if true
+// false if false
+// wow
+func (sdk *BeamNGSDK) PrefersKm() bool {
+	return sdk.Data.Flags&bngsdk.OG_KM != 0
+}
+
+// Prefers BAR:
+// true if true
+// false if false
+// wow
+func (sdk *BeamNGSDK) PrefersBAR() bool {
+	return sdk.Data.Flags&bngsdk.OG_BAR != 0
+}
+
+// Flags - functions to check if a given flag is ON [END]
