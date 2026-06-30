@@ -233,7 +233,7 @@ func (sdk *BeamNGSDK) HasRightIndicatorLight() bool {
 	return sdk.Data.DashLights&DL_SIGNAL_R != 0
 }
 
-// AnyIndicator returns:
+// HasAnyIndicatorLight returns:
 // true if its available
 // false if its unavailable
 func (sdk *BeamNGSDK) HasAnyIndicatorLight() bool {
