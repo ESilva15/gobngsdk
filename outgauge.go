@@ -13,18 +13,18 @@ const (
 
 // DL_x Flags
 const (
-	DL_SHIFT      = 2 ^ 0  // shift light
-	DL_FULLBEAM   = 2 ^ 1  // full beam
-	DL_HANDBRAKE  = 2 ^ 2  // handbrake
-	DL_PITSPEED   = 2 ^ 3  // pit speed limiter // N/A
-	DL_TC         = 2 ^ 4  // tc active or switched off
-	DL_SIGNAL_L   = 2 ^ 5  // left turn signal
-	DL_SIGNAL_R   = 2 ^ 6  // right turn signal
-	DL_SIGNAL_ANY = 2 ^ 7  // shared turn signal // N/A
-	DL_OILWARN    = 2 ^ 8  // oil pressure warning
-	DL_BATTERY    = 2 ^ 9  // battery warning
-	DL_ABS        = 2 ^ 10 // abs active or switched off
-	DL_SPARE      = 2 ^ 11 // N/A
+	DL_SHIFT      = 1 << 0  // shift light
+	DL_FULLBEAM   = 1 << 1  // full beam
+	DL_HANDBRAKE  = 1 << 2  // handbrake
+	DL_PITSPEED   = 1 << 3  // pit speed limiter // N/A
+	DL_TC         = 1 << 4  // tc active or switched off
+	DL_SIGNAL_L   = 1 << 5  // left turn signal
+	DL_SIGNAL_R   = 1 << 6  // right turn signal
+	DL_SIGNAL_ANY = 1 << 7  // shared turn signal // N/A
+	DL_OILWARN    = 1 << 8  // oil pressure warning
+	DL_BATTERY    = 1 << 9  // battery warning
+	DL_ABS        = 1 << 10 // abs active or switched off
+	DL_SPARE      = 1 << 11 // N/A
 )
 
 // Outgauge describes the data served by the BeamNG outgauge server
