@@ -38,9 +38,8 @@ func BenchmarkReadData(b *testing.B) {
 	}
 	packetBytes := buf.Bytes()
 
-	// 4. Reset the timer to isolate the setup allocations from the loop metrics
 	b.ResetTimer()
-	b.ReportAllocs() // Tracks memory allocations per operation (B/op and allocs/op)
+	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
 		// Feed a packet into the network buffer right before reading it

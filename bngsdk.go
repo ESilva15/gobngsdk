@@ -3,7 +3,6 @@
 package bngsdk
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -22,8 +21,6 @@ type BeamNGSDK struct {
 	Conn   *net.UDPConn
 	Buffer []byte
 	Data   Outgauge
-	// Internal data
-	reader bytes.Reader
 }
 
 func createUDPConnection(ip string, port int) (*net.UDPConn, *net.UDPAddr, error) {
@@ -84,7 +81,6 @@ func (sdk *BeamNGSDK) ReadData() error {
 	}
 
 	// Read the binary data into the struct
-	sdk.reader.Reset(sdk.Buffer[:n])
 	err = sdk.parseData()
 	if err != nil {
 		fmt.Println("Error decoding UDP packet:", err)
