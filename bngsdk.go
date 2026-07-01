@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"net"
 )
 
@@ -17,11 +18,12 @@ const (
 )
 
 type BeamNGSDK struct {
-	Addr     *net.UDPAddr
-	Conn     *net.UDPConn
-	Buffer   []byte
-	Data     *Outgauge
-	DataDict map[string]any
+	Addr   *net.UDPAddr
+	Conn   *net.UDPConn
+	Buffer []byte
+	Data   Outgauge
+	// Internal data
+	reader bytes.Reader
 }
 
 func createUDPConnection(ip string, port int) (*net.UDPConn, *net.UDPAddr, error) {
@@ -40,6 +42,32 @@ func createUDPConnection(ip string, port int) (*net.UDPConn, *net.UDPAddr, error
 	return conn, addr, nil
 }
 
+// parseData will parse the bytes read from the socket into the Outgauge struct
+func (sdk *BeamNGSDK) parseData() error {
+	sdk.Data.Time = binary.LittleEndian.Uint32(sdk.Buffer[0:4])
+	copy(sdk.Data.Car[:], sdk.Buffer[4:8])
+	sdk.Data.Flags = binary.LittleEndian.Uint16(sdk.Buffer[8:10])
+	sdk.Data.Gear = int8(sdk.Buffer[10])
+	sdk.Data.Plid = int8(sdk.Buffer[11])
+	sdk.Data.Speed = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[12:16]))
+	sdk.Data.RPM = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[16:20]))
+	sdk.Data.Turbo = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[20:24]))
+	sdk.Data.EngTemp = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[24:28]))
+	sdk.Data.Fuel = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[28:32]))
+	sdk.Data.OilPressure = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[32:36]))
+	sdk.Data.OilTemp = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[36:40]))
+	sdk.Data.DashLights = binary.LittleEndian.Uint32(sdk.Buffer[40:44])
+	sdk.Data.ShowLights = binary.LittleEndian.Uint32(sdk.Buffer[44:48])
+	sdk.Data.Throttle = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[48:52]))
+	sdk.Data.Brake = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[52:56]))
+	sdk.Data.Throttle = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[56:60]))
+	copy(sdk.Data.Display1[:], sdk.Buffer[60:76])
+	copy(sdk.Data.Display2[:], sdk.Buffer[76:92])
+	sdk.Data.ID = int32(binary.LittleEndian.Uint32(sdk.Buffer[92:96]))
+
+	return nil
+}
+
 // ReadData will read new data from the UDP server
 func (sdk *BeamNGSDK) ReadData() error {
 	// Receive data from the socket
@@ -50,24 +78,18 @@ func (sdk *BeamNGSDK) ReadData() error {
 	}
 
 	// Check if enough data was received to fill our struct
-	if n < binary.Size(Outgauge{}) {
+	if n < outgaugeSize {
 		fmt.Println("Received packet too small for Outgauge struct")
 		return err
 	}
 
 	// Read the binary data into the struct
-	// NOTE: create a reader for this struct and then reset it with the data from here
-	// instead of creating this one everytime
-	reader := bytes.NewReader(sdk.Buffer[:n])
-	if err := binary.Read(reader, binary.LittleEndian, sdk.Data); err != nil {
+	sdk.reader.Reset(sdk.Buffer[:n])
+	err = sdk.parseData()
+	if err != nil {
 		fmt.Println("Error decoding UDP packet:", err)
 		return err
 	}
-
-	// Update the local map
-	// NOTE: maybe stop doing this here and make the user request this when he
-	// explicitly wants it
-	sdk.DataDict = sdk.Data.ToMap()
 
 	// this means there's new data
 	return nil
@@ -91,8 +113,6 @@ func Init(ip string, port int) (BeamNGSDK, error) {
 
 	// Initiate the data variables
 	sdk.Buffer = make([]byte, 1024)
-	sdk.Data = &Outgauge{}
-	sdk.DataDict = sdk.Data.ToMap()
 
 	return sdk, nil
 }
@@ -289,3 +309,33 @@ func (sdk *BeamNGSDK) PrefersBAR() bool {
 }
 
 // Flags - functions to check if a given flag is ON [END]
+
+// Data Retrieval [START]
+
+// ToMap creates a map with the data in the Outgauge struct
+func (sdk *BeamNGSDK) ToMap() map[string]any {
+	return map[string]any{
+		"Time":        sdk.Data.Time,        // time in milliseconds (to check order)
+		"Car":         sdk.Data.Car,         // Car name
+		"Flags":       sdk.Data.Flags,       // Info (see OG_x below)
+		"Gear":        sdk.Data.Gear,        // Reverse:0, Neutral:1, First:2...
+		"Plid":        sdk.Data.Plid,        // Unique ID of viewed player (0 = none)
+		"Speed":       sdk.Data.Speed,       // M/S
+		"RPM":         sdk.Data.RPM,         // RPM
+		"Turbo":       sdk.Data.Turbo,       // BAR
+		"EngTemp":     sdk.Data.EngTemp,     // C
+		"Fuel":        sdk.Data.Fuel,        // 0 to 1
+		"OilPressure": sdk.Data.OilPressure, // BAR
+		"OilTemp":     sdk.Data.OilTemp,     // C
+		"DashLights":  sdk.Data.DashLights,  // Dash lights available (see DL_x below)
+		"ShowLights":  sdk.Data.ShowLights,  // Dash lights currently switched on
+		"Throttle":    sdk.Data.Throttle,    // 0 to 1
+		"Brake":       sdk.Data.Brake,       // 0 to 1
+		"Clutch":      sdk.Data.Clutch,      // 0 to 1
+		"Display1":    sdk.Data.Display1,    // Usually Fuel
+		"Display2":    sdk.Data.Display2,    // Usually Settings
+		"ID":          sdk.Data.ID,          // optional - only if OutGauge ID is specified
+	}
+}
+
+// Data Retrieval [END]
