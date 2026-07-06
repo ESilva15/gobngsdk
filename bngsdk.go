@@ -143,7 +143,7 @@ func (sdk *BeamNGSDK) Handbrake() bool {
 // false if the pit speed limiter is off
 // NOTE: this may not be used in BeamNG.drive, haven't checked yet
 func (sdk *BeamNGSDK) Pitspeed() bool {
-	return sdk.Data.ShowLights&DL_HANDBRAKE != 0
+	return sdk.Data.ShowLights&DL_PITSPEED != 0
 }
 
 // TractionControl returns:
