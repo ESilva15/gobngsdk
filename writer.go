@@ -2,6 +2,7 @@ package bngsdk
 
 type BngExporter interface {
 	Write([]byte) (int, error)
+	Close() error
 }
 
 func NewSocketExporter(address string, port int) (BngExporter, error) {

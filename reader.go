@@ -1,19 +1,13 @@
 package bngsdk
 
-import "os"
-
 type BngImporter interface {
 	Reset() error
 	Next([]byte) (int, error)
+	Close() error
 }
 
 func NewBinaryImporter(file string) (BngImporter, error) {
-	bin, err := os.Open(file)
-	if err != nil {
-		return nil, err
-	}
-
-	return OgBinReader(bin), nil
+	return NewOgBinReader(file), nil
 }
 
 func NewSocketImporter(address string, port int) (BngImporter, error) {

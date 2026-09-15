@@ -2,21 +2,35 @@ package bngsdk
 
 import (
 	"io"
+	"os"
 	"unsafe"
 )
 
 type GobReader struct {
 	TotalRead int64
-	File      io.ReadSeeker
+	File      *os.File
 	Buf       []byte
 }
 
-func OgBinReader(r io.ReadSeeker) *GobReader {
+func NewOgBinReader(fp string) *GobReader {
+	bin, err := os.Open(fp)
+	if err != nil {
+		return nil
+	}
+
 	return &GobReader{
 		TotalRead: 0,
-		File:      r,
+		File:      bin,
 		Buf:       make([]byte, unsafe.Sizeof(Outgauge{})),
 	}
+}
+
+func (g *GobReader) Close() error {
+	if g.File != nil {
+		return g.File.Close()
+	}
+
+	return nil
 }
 
 func (g *GobReader) Reset() error {

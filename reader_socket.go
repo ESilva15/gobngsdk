@@ -20,6 +20,14 @@ func NewOgUDPReader(ip string, port int) (*OgUDPReader, error) {
 	}, nil
 }
 
+func (ogr *OgUDPReader) Close() error {
+	if ogr.udpConnection != nil {
+		return ogr.udpConnection.Close()
+	}
+
+	return nil
+}
+
 func (ogr *OgUDPReader) Reset() error {
 	// NOTE: what to implement here?
 	return nil

@@ -3,11 +3,9 @@ package bngsdk
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 	"log/slog"
 	"math"
-	"time"
 	"unsafe"
 )
 
@@ -42,12 +40,11 @@ type Options struct {
 }
 
 type BeamNGSDK struct {
-	Opts     Options
-	reader   BngImporter
-	writer   BngExporter
-	Data     Outgauge
-	buffer   []byte
-	receiver *Receiver
+	Opts   Options
+	reader BngImporter
+	writer BngExporter
+	Data   Outgauge
+	buffer []byte
 }
 
 func NewBngSDK(opts Options) (*BeamNGSDK, error) {
@@ -74,6 +71,20 @@ func NewBngSDK(opts Options) (*BeamNGSDK, error) {
 	}
 
 	return &sdk, nil
+}
+
+func (sdk *BeamNGSDK) Close() error {
+	sdk.buffer = nil
+
+	if sdk.writer != nil {
+		sdk.writer.Close()
+	}
+
+	if sdk.reader != nil {
+		sdk.reader.Close()
+	}
+
+	return nil
 }
 
 func (sdk *BeamNGSDK) openReader() error {
@@ -208,59 +219,6 @@ func ParseData(ogData *Outgauge, buffer []byte) error {
 func (sdk *BeamNGSDK) parseData(buffer []byte) error {
 	return ParseData(&sdk.Data, buffer)
 }
-
-// ReadData will read new data from the UDP server
-func (sdk *BeamNGSDK) ReadData(timeout time.Duration) error {
-	buf := make([]byte, 2048)
-	nBytes := sdk.receiver.GetLatest(buf)
-	if nBytes < 0 {
-		return fmt.Errorf("no new data")
-	}
-
-	// Read the binary data into the struct
-	err := sdk.parseData(buf)
-	if err != nil {
-		fmt.Println("Error decoding UDP packet:", err)
-		return err
-	}
-
-	// this means there's new data
-	return nil
-}
-
-func (sdk *BeamNGSDK) GetBuffer() []byte {
-	buf := make([]byte, 2048)
-	sdk.receiver.GetLatest(buf)
-	return buf
-}
-
-func (sdk *BeamNGSDK) GetBufferPtr() []byte {
-	return sdk.receiver.GetBufferPtr()
-}
-
-func (sdk *BeamNGSDK) Close() {
-	if sdk.receiver != nil {
-		sdk.receiver.Close()
-	}
-}
-
-// Init initializes a BeamNG SDK struct
-// NOTE: Change this to output a *BeamNGSDK
-// func Init(ip string, port int) (BeamNGSDK, error) {
-// 	var err error
-// 	sdk := BeamNGSDK{}
-//
-// 	// Create the connection to the OutGauge server
-// 	sdk.Conn, sdk.Addr, err = createUDPConnection(ip, port, int(unsafe.Sizeof(sdk.Buffer)))
-// 	if err != nil {
-// 		return BeamNGSDK{}, err
-// 	}
-//
-// 	// Initiate the data variables
-// 	sdk.Buffer = make([]byte, 1024)
-//
-// 	return sdk, nil
-// }
 
 // SDK utilities
 
