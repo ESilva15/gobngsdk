@@ -3,9 +3,10 @@ package bngsdk
 
 import (
 	"encoding/binary"
-	"fmt"
+	"io"
+	"log/slog"
 	"math"
-	"net"
+	"unsafe"
 )
 
 const (
@@ -15,101 +16,208 @@ const (
 	DefaultUDPPort = 4444
 )
 
+type TelemetryContainer int
+
+const (
+	BinaryFile TelemetryContainer = iota
+	UDPData    TelemetryContainer = iota
+)
+
+type Options struct {
+	Logger *slog.Logger
+	// Import settings
+	SourceType       TelemetryContainer // type of source data
+	BinSourcePath    string             // Path to source binary
+	ImportUDPAddress string
+	ImportUDPPort    int
+	Loop             bool // Wheter to loop when we reach the end of file
+	// Export settings
+	ExportUDPAddress string
+	ExportUDPPort    int
+	ExportDataType   TelemetryContainer // export type of telemetry: store .bin or replay in UDP
+	ExportDataPath   string             // path where to export the data
+	ExportData       bool               // whether to export the telemetry data
+}
+
 type BeamNGSDK struct {
-	Addr   *net.UDPAddr
-	Conn   *net.UDPConn
-	Buffer []byte
+	Opts   Options
+	reader BngImporter
+	writer BngExporter
 	Data   Outgauge
+	buffer []byte
 }
 
-func createUDPConnection(ip string, port int) (*net.UDPConn, *net.UDPAddr, error) {
-	// Define the IP address and port to listen on
-	addr := &net.UDPAddr{
-		IP:   net.ParseIP(ip),
-		Port: port,
+func NewBngSDK(opts Options) (*BeamNGSDK, error) {
+	sdk := BeamNGSDK{
+		Opts:   opts,
+		buffer: make([]byte, unsafe.Sizeof(Outgauge{})),
 	}
 
-	// Create a UDP socket
-	conn, err := net.ListenUDP("udp", addr)
+	// Set the passed logger as the default logger
+	slog.SetDefault(sdk.Opts.Logger)
+
+	var err error
+
+	err = sdk.openReader()
 	if err != nil {
-		return nil, nil, err
+		slog.Error("failed to open reader", "err", err)
+		return nil, err
 	}
 
-	return conn, addr, nil
-}
-
-// parseData will parse the bytes read from the socket into the Outgauge struct
-func (sdk *BeamNGSDK) parseData() error {
-	sdk.Data.Time = binary.LittleEndian.Uint32(sdk.Buffer[0:4])
-	copy(sdk.Data.Car[:], sdk.Buffer[4:8])
-	sdk.Data.Flags = binary.LittleEndian.Uint16(sdk.Buffer[8:10])
-	sdk.Data.Gear = int8(sdk.Buffer[10])
-	sdk.Data.Plid = int8(sdk.Buffer[11])
-	sdk.Data.Speed = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[12:16]))
-	sdk.Data.RPM = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[16:20]))
-	sdk.Data.Turbo = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[20:24]))
-	sdk.Data.EngTemp = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[24:28]))
-	sdk.Data.Fuel = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[28:32]))
-	sdk.Data.OilPressure = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[32:36]))
-	sdk.Data.OilTemp = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[36:40]))
-	sdk.Data.DashLights = binary.LittleEndian.Uint32(sdk.Buffer[40:44])
-	sdk.Data.ShowLights = binary.LittleEndian.Uint32(sdk.Buffer[44:48])
-	sdk.Data.Throttle = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[48:52]))
-	sdk.Data.Brake = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[52:56]))
-	sdk.Data.Throttle = math.Float32frombits(binary.LittleEndian.Uint32(sdk.Buffer[56:60]))
-	copy(sdk.Data.Display1[:], sdk.Buffer[60:76])
-	copy(sdk.Data.Display2[:], sdk.Buffer[76:92])
-	sdk.Data.ID = int32(binary.LittleEndian.Uint32(sdk.Buffer[92:96]))
-
-	return nil
-}
-
-// ReadData will read new data from the UDP server
-func (sdk *BeamNGSDK) ReadData() error {
-	// Receive data from the socket
-	n, _, err := sdk.Conn.ReadFromUDP(sdk.Buffer)
+	err = sdk.openWriter()
 	if err != nil {
-		fmt.Println("Error reading from UDP:", err)
-		return err
+		slog.Error("failed to open writer", "err", err)
+		return nil, err
 	}
 
-	// Check if enough data was received to fill our struct
-	if n < outgaugeSize {
-		fmt.Println("Received packet too small for Outgauge struct")
-		return err
-	}
-
-	// Read the binary data into the struct
-	err = sdk.parseData()
-	if err != nil {
-		fmt.Println("Error decoding UDP packet:", err)
-		return err
-	}
-
-	// this means there's new data
-	return nil
+	return &sdk, nil
 }
 
 func (sdk *BeamNGSDK) Close() error {
-	return sdk.Conn.Close()
-}
+	sdk.buffer = nil
 
-// Init initializes a BeamNG SDK struct
-// NOTE: Change this to output a *BeamNGSDK
-func Init(ip string, port int) (BeamNGSDK, error) {
-	var err error
-	sdk := BeamNGSDK{}
-
-	// Create the connection to the OutGauge server
-	sdk.Conn, sdk.Addr, err = createUDPConnection(ip, port)
-	if err != nil {
-		return BeamNGSDK{}, err
+	if sdk.writer != nil {
+		sdk.writer.Close()
 	}
 
-	// Initiate the data variables
-	sdk.Buffer = make([]byte, 1024)
+	if sdk.reader != nil {
+		sdk.reader.Close()
+	}
 
-	return sdk, nil
+	return nil
+}
+
+func (sdk *BeamNGSDK) openReader() error {
+	switch sdk.Opts.SourceType {
+	case BinaryFile:
+		reader, err := NewBinaryImporter(sdk.Opts.BinSourcePath)
+		if err != nil {
+			slog.Error("failed to create BinaryImporter",
+				"path", sdk.Opts.BinSourcePath, "err", err)
+			return err
+		}
+
+		slog.Info(
+			"created BinaryImporter",
+			"path", sdk.Opts.BinSourcePath,
+		)
+		sdk.reader = reader
+	case UDPData:
+		reader, err := NewSocketImporter(sdk.Opts.ImportUDPAddress, sdk.Opts.ImportUDPPort)
+		if err != nil {
+			slog.Error(
+				"failed to create SocketImporter",
+				"address", sdk.Opts.ImportUDPAddress, "port", sdk.Opts.ImportUDPPort, "err", err,
+			)
+			return err
+		}
+
+		slog.Info(
+			"created SocketImporter",
+			"address", sdk.Opts.ImportUDPAddress, "port", sdk.Opts.ImportUDPPort,
+		)
+		sdk.reader = reader
+	}
+
+	return nil
+}
+
+func (sdk *BeamNGSDK) openWriter() error {
+	// if the user didn't request data export we don't need a writer
+	if !sdk.Opts.ExportData {
+		return nil
+	}
+
+	switch sdk.Opts.ExportDataType {
+	case BinaryFile:
+		writer, err := NewBinaryExporter(sdk.Opts.ExportDataPath)
+		if err != nil {
+			slog.Error("failed to create BinaryExporter",
+				"path", sdk.Opts.ExportDataPath, "err", err)
+			return err
+		}
+
+		slog.Info(
+			"created BinaryExporter",
+			"path", sdk.Opts.ExportDataPath,
+		)
+		sdk.writer = writer
+	case UDPData:
+		writer, err := NewSocketExporter(sdk.Opts.ExportUDPAddress, sdk.Opts.ExportUDPPort)
+		if err != nil {
+			slog.Error(
+				"failed to create SocketExporter",
+				"address", sdk.Opts.ExportUDPAddress, "port", sdk.Opts.ExportUDPPort, "err", err,
+			)
+			return err
+		}
+
+		slog.Info(
+			"created SocketExporter",
+			"address", sdk.Opts.ExportUDPAddress, "port", sdk.Opts.ExportUDPPort,
+		)
+		sdk.writer = writer
+	}
+
+	return nil
+}
+
+func (sdk *BeamNGSDK) Update() (int, error) {
+	var nBytes int
+	var err error
+
+	nBytes, err = sdk.reader.Next(sdk.buffer)
+	// We check this first because we want to know if we need to loop
+	if err == io.EOF {
+		if sdk.Opts.Loop {
+			err = sdk.reader.Reset()
+			if err != nil {
+				return 0, err
+			}
+		}
+
+		// NOTE: could we make the reset return the next piece of data?
+		// We update to the start of the file since we had to reset
+		nBytes, err = sdk.reader.Next(sdk.buffer)
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	if sdk.Opts.ExportData {
+		sdk.writer.Write(sdk.buffer)
+	}
+
+	return nBytes, sdk.parseData(sdk.buffer)
+}
+
+func ParseData(ogData *Outgauge, buffer []byte) error {
+	ogData.Time = binary.LittleEndian.Uint32(buffer[0:4])
+	copy(ogData.Car[:], buffer[4:8])
+	ogData.Flags = binary.LittleEndian.Uint16(buffer[8:10])
+	ogData.Gear = int8(buffer[10])
+	ogData.Plid = int8(buffer[11])
+	ogData.Speed = math.Float32frombits(binary.LittleEndian.Uint32(buffer[12:16]))
+	ogData.RPM = math.Float32frombits(binary.LittleEndian.Uint32(buffer[16:20]))
+	ogData.Turbo = math.Float32frombits(binary.LittleEndian.Uint32(buffer[20:24]))
+	ogData.EngTemp = math.Float32frombits(binary.LittleEndian.Uint32(buffer[24:28]))
+	ogData.Fuel = math.Float32frombits(binary.LittleEndian.Uint32(buffer[28:32]))
+	ogData.OilPressure = math.Float32frombits(binary.LittleEndian.Uint32(buffer[32:36]))
+	ogData.OilTemp = math.Float32frombits(binary.LittleEndian.Uint32(buffer[36:40]))
+	ogData.DashLights = binary.LittleEndian.Uint32(buffer[40:44])
+	ogData.ShowLights = binary.LittleEndian.Uint32(buffer[44:48])
+	ogData.Throttle = math.Float32frombits(binary.LittleEndian.Uint32(buffer[48:52]))
+	ogData.Brake = math.Float32frombits(binary.LittleEndian.Uint32(buffer[52:56]))
+	ogData.Clutch = math.Float32frombits(binary.LittleEndian.Uint32(buffer[56:60]))
+	copy(ogData.Display1[:], buffer[60:76])
+	copy(ogData.Display2[:], buffer[76:92])
+	ogData.ID = int32(binary.LittleEndian.Uint32(buffer[92:96]))
+
+	return nil
+}
+
+func (sdk *BeamNGSDK) parseData(buffer []byte) error {
+	return ParseData(&sdk.Data, buffer)
 }
 
 // SDK utilities
