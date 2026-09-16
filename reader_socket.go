@@ -1,13 +1,14 @@
 package bngsdk
 
 import (
-	"fmt"
-	"log/slog"
+	"errors"
 )
 
 type OgUDPReader struct {
 	udpConnection *UDPTransport
 }
+
+var ErrInvalidOutgaugeData = errors.New("data is of different size than outgauge")
 
 func NewOgUDPReader(ip string, port int) (*OgUDPReader, error) {
 	conn, err := NewUDPReader(ip, port)
@@ -34,17 +35,15 @@ func (ogr *OgUDPReader) Reset() error {
 }
 
 func (ogr *OgUDPReader) Next(buffer []byte) (int, error) {
-	slog.Debug("Reading")
-
 	nBytes, err := ogr.udpConnection.Read(buffer)
 	if err != nil {
 		return 0, err
 	}
 
 	// Check if enough data was received to fill our struct
-	if nBytes < outgaugeSize {
-		return 0, fmt.Errorf("received data is smaller than outgauge size")
+	if nBytes != outgaugeSize {
+		return 0, ErrInvalidOutgaugeData
 	}
 
-	return 0, nil
+	return nBytes, nil
 }

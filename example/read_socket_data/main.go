@@ -35,7 +35,7 @@ func main() {
 	}
 	defer sdk.Close()
 
-	ticker := time.NewTicker(time.Second / 60)
+	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
 	for {

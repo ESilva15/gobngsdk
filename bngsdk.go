@@ -181,7 +181,7 @@ func (sdk *BeamNGSDK) Update() (int, error) {
 		nBytes, err = sdk.reader.Next(sdk.buffer)
 	}
 	if err != nil {
-		return nBytes, err
+		return 0, err
 	}
 
 	if sdk.Opts.ExportData {
