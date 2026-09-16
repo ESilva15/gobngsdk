@@ -41,7 +41,7 @@ func main() {
 	for {
 		select {
 		case <-ticker.C:
-			_, err := sdk.Update()
+			og, err := sdk.Update()
 			if err != nil {
 				log.Fatalf("failed to update data: %+v", err)
 			}
@@ -49,7 +49,7 @@ func main() {
 			fmt.Printf("\033[?25l\033[2J\033[H")
 			fmt.Printf(
 				"Gear: %d, RPM: %f, Speed: %f\n",
-				sdk.Data.Gear, sdk.Data.RPM, sdk.Data.Speed,
+				og.Gear, og.RPM, og.Speed,
 			)
 		}
 	}

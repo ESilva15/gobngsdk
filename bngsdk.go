@@ -2,11 +2,8 @@
 package bngsdk
 
 import (
-	"encoding/binary"
 	"io"
 	"log/slog"
-	"math"
-	"unsafe"
 )
 
 const (
@@ -43,18 +40,15 @@ type BeamNGSDK struct {
 	Opts   Options
 	reader BngImporter
 	writer BngExporter
-	Data   Outgauge
+	data   Outgauge
 	buffer []byte
 }
 
 func NewBngSDK(opts Options) (*BeamNGSDK, error) {
 	sdk := BeamNGSDK{
 		Opts:   opts,
-		buffer: make([]byte, unsafe.Sizeof(Outgauge{})),
+		buffer: make([]byte, outgaugeSize),
 	}
-
-	// Set the passed logger as the default logger
-	slog.SetDefault(sdk.Opts.Logger)
 
 	var err error
 
@@ -162,236 +156,34 @@ func (sdk *BeamNGSDK) openWriter() error {
 	return nil
 }
 
-func (sdk *BeamNGSDK) Update() (int, error) {
-	var nBytes int
+func (sdk *BeamNGSDK) Update() (*Outgauge, error) {
 	var err error
 
-	nBytes, err = sdk.reader.Next(sdk.buffer)
+	_, err = sdk.reader.Next(sdk.buffer)
 	// We check this first because we want to know if we need to loop
 	if err == io.EOF {
 		if sdk.Opts.Loop {
 			err = sdk.reader.Reset()
 			if err != nil {
-				return 0, err
+				return nil, err
 			}
 		}
 
 		// NOTE: could we make the reset return the next piece of data?
 		// We update to the start of the file since we had to reset
-		nBytes, err = sdk.reader.Next(sdk.buffer)
+		_, err = sdk.reader.Next(sdk.buffer)
 	}
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	if sdk.Opts.ExportData {
 		sdk.writer.Write(sdk.buffer)
 	}
 
-	return nBytes, sdk.parseData(sdk.buffer)
-}
-
-func ParseData(ogData *Outgauge, buffer []byte) error {
-	ogData.Time = binary.LittleEndian.Uint32(buffer[0:4])
-	copy(ogData.Car[:], buffer[4:8])
-	ogData.Flags = binary.LittleEndian.Uint16(buffer[8:10])
-	ogData.Gear = int8(buffer[10])
-	ogData.Plid = int8(buffer[11])
-	ogData.Speed = math.Float32frombits(binary.LittleEndian.Uint32(buffer[12:16]))
-	ogData.RPM = math.Float32frombits(binary.LittleEndian.Uint32(buffer[16:20]))
-	ogData.Turbo = math.Float32frombits(binary.LittleEndian.Uint32(buffer[20:24]))
-	ogData.EngTemp = math.Float32frombits(binary.LittleEndian.Uint32(buffer[24:28]))
-	ogData.Fuel = math.Float32frombits(binary.LittleEndian.Uint32(buffer[28:32]))
-	ogData.OilPressure = math.Float32frombits(binary.LittleEndian.Uint32(buffer[32:36]))
-	ogData.OilTemp = math.Float32frombits(binary.LittleEndian.Uint32(buffer[36:40]))
-	ogData.DashLights = binary.LittleEndian.Uint32(buffer[40:44])
-	ogData.ShowLights = binary.LittleEndian.Uint32(buffer[44:48])
-	ogData.Throttle = math.Float32frombits(binary.LittleEndian.Uint32(buffer[48:52]))
-	ogData.Brake = math.Float32frombits(binary.LittleEndian.Uint32(buffer[52:56]))
-	ogData.Clutch = math.Float32frombits(binary.LittleEndian.Uint32(buffer[56:60]))
-	copy(ogData.Display1[:], buffer[60:76])
-	copy(ogData.Display2[:], buffer[76:92])
-	ogData.ID = int32(binary.LittleEndian.Uint32(buffer[92:96]))
-
-	return nil
+	return &sdk.data, sdk.parseData(sdk.buffer)
 }
 
 func (sdk *BeamNGSDK) parseData(buffer []byte) error {
-	return ParseData(&sdk.Data, buffer)
+	return sdk.data.ParseData(buffer)
 }
-
-// SDK utilities
-
-// ShowLights - functions to check if a given dash light is on [START]
-
-// ShiftLight reports whether the shift light is on
-func (sdk *BeamNGSDK) ShiftLight() bool {
-	return sdk.Data.ShowLights&DL_SHIFT != 0
-}
-
-// HighBeam reports whether high beams are on
-func (sdk *BeamNGSDK) HighBeam() bool {
-	return sdk.Data.ShowLights&DL_FULLBEAM != 0
-}
-
-// Handbrake reports whether the handbrake is pulled
-func (sdk *BeamNGSDK) Handbrake() bool {
-	return sdk.Data.ShowLights&DL_HANDBRAKE != 0
-}
-
-// Pitspeed reports whether the pit speed limiter is engaged
-//
-// NOTE: this may not be used in BeamNG.drive, haven't checked yet
-func (sdk *BeamNGSDK) Pitspeed() bool {
-	return sdk.Data.ShowLights&DL_PITSPEED != 0
-}
-
-// TractionControl reports wheter TC is engaged
-func (sdk *BeamNGSDK) TractionControl() bool {
-	return sdk.Data.ShowLights&DL_TC != 0
-}
-
-// LeftIndicator reports whether the left indicator is on
-func (sdk *BeamNGSDK) LeftIndicator() bool {
-	return sdk.Data.ShowLights&DL_SIGNAL_L != 0
-}
-
-// RightIndicator reports wheter the right indicator is on
-func (sdk *BeamNGSDK) RightIndicator() bool {
-	return sdk.Data.ShowLights&DL_SIGNAL_R != 0
-}
-
-// AnyIndicator reports whether any indicator is on
-func (sdk *BeamNGSDK) AnyIndicator() bool {
-	return sdk.Data.ShowLights&DL_SIGNAL_ANY != 0
-}
-
-// OilLight reports whether the oil warning light is on
-func (sdk *BeamNGSDK) OilLight() bool {
-	return sdk.Data.ShowLights&DL_OILWARN != 0
-}
-
-// BatteryLight reports whether the battery light is on
-func (sdk *BeamNGSDK) BatteryLight() bool {
-	return sdk.Data.ShowLights&DL_BATTERY != 0
-}
-
-// ABS reports whether the ABS light is on
-func (sdk *BeamNGSDK) ABS() bool {
-	return sdk.Data.ShowLights&DL_ABS != 0
-}
-
-// ShowLights - functions to check if a given dash light is on [END]
-
-// DashLights - functions to check if a given dash light is provided [START]
-
-// HasShiftLight reports whether a shift light is available
-func (sdk *BeamNGSDK) HasShiftLight() bool {
-	return sdk.Data.DashLights&DL_SHIFT != 0
-}
-
-// HasHighBeamLight reports whether a high beam light is available
-func (sdk *BeamNGSDK) HasHighBeamLight() bool {
-	return sdk.Data.DashLights&DL_FULLBEAM != 0
-}
-
-// HasHandbrakeLight reports wheter a handbrake light is available
-func (sdk *BeamNGSDK) HasHandbrakeLight() bool {
-	return sdk.Data.DashLights&DL_HANDBRAKE != 0
-}
-
-// HasPitspeed reports whether a pit speed limitr is available
-// NOTE: this may not be used in BeamNG.drive, haven't checked yet
-func (sdk *BeamNGSDK) HasPitspeed() bool {
-	return sdk.Data.DashLights&DL_PITSPEED != 0
-}
-
-// HasTractionControlLight reports whether a traction control light is available
-func (sdk *BeamNGSDK) HasTractionControlLight() bool {
-	return sdk.Data.DashLights&DL_TC != 0
-}
-
-// HasLeftIndicatorLight reports whether a left indicator is available
-func (sdk *BeamNGSDK) HasLeftIndicatorLight() bool {
-	return sdk.Data.DashLights&DL_SIGNAL_L != 0
-}
-
-// HasRightIndicatorLight reports whether a right indicator is available
-func (sdk *BeamNGSDK) HasRightIndicatorLight() bool {
-	return sdk.Data.DashLights&DL_SIGNAL_R != 0
-}
-
-// HasAnyIndicatorLight reports whether an any indicator light is available
-func (sdk *BeamNGSDK) HasAnyIndicatorLight() bool {
-	return sdk.Data.DashLights&DL_SIGNAL_ANY != 0
-}
-
-// HasOilLight reports whether a oil light is available
-func (sdk *BeamNGSDK) HasOilLight() bool {
-	return sdk.Data.DashLights&DL_OILWARN != 0
-}
-
-// HasBatteryLight reports whether a battery light is available
-func (sdk *BeamNGSDK) HasBatteryLight() bool {
-	return sdk.Data.DashLights&DL_BATTERY != 0
-}
-
-// HasABSLight reports whether an ABS light is available
-func (sdk *BeamNGSDK) HasABSLight() bool {
-	return sdk.Data.DashLights&DL_ABS != 0
-}
-
-// DashLights - functions to check if a given dash light is provided [END]
-
-// Flags - functions to check if a given flag is ON [START]
-
-// HasTurbo reports whether there's a turbo
-func (sdk *BeamNGSDK) HasTurbo() bool {
-	return sdk.Data.Flags&OG_TURBO != 0
-}
-
-// PrefersKm reports whether the user prefers kilometers:
-//   - true is prefers Km
-//   - false is prefers Mi
-func (sdk *BeamNGSDK) PrefersKm() bool {
-	return sdk.Data.Flags&OG_KM != 0
-}
-
-// PrefersBAR reports whether the user prefers BAR:
-//   - true is prefers BAR
-//   - false is prefers PSI
-func (sdk *BeamNGSDK) PrefersBAR() bool {
-	return sdk.Data.Flags&OG_BAR != 0
-}
-
-// Flags - functions to check if a given flag is ON [END]
-
-// Data Retrieval [START]
-
-// ToMap creates a map with the data in the Outgauge struct
-func (sdk *BeamNGSDK) ToMap() map[string]any {
-	return map[string]any{
-		"Time":        sdk.Data.Time,        // time in milliseconds (to check order)
-		"Car":         sdk.Data.Car,         // Car name
-		"Flags":       sdk.Data.Flags,       // Info (see OG_x below)
-		"Gear":        sdk.Data.Gear,        // Reverse:0, Neutral:1, First:2...
-		"Plid":        sdk.Data.Plid,        // Unique ID of viewed player (0 = none)
-		"Speed":       sdk.Data.Speed,       // M/S
-		"RPM":         sdk.Data.RPM,         // RPM
-		"Turbo":       sdk.Data.Turbo,       // BAR
-		"EngTemp":     sdk.Data.EngTemp,     // C
-		"Fuel":        sdk.Data.Fuel,        // 0 to 1
-		"OilPressure": sdk.Data.OilPressure, // BAR
-		"OilTemp":     sdk.Data.OilTemp,     // C
-		"DashLights":  sdk.Data.DashLights,  // Dash lights available (see DL_x below)
-		"ShowLights":  sdk.Data.ShowLights,  // Dash lights currently switched on
-		"Throttle":    sdk.Data.Throttle,    // 0 to 1
-		"Brake":       sdk.Data.Brake,       // 0 to 1
-		"Clutch":      sdk.Data.Clutch,      // 0 to 1
-		"Display1":    sdk.Data.Display1,    // Usually Fuel
-		"Display2":    sdk.Data.Display2,    // Usually Settings
-		"ID":          sdk.Data.ID,          // optional - only if OutGauge ID is specified
-	}
-}
-
-// Data Retrieval [END]
