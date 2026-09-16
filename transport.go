@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net"
+	"sync"
 	"time"
 	"unsafe"
 )
@@ -12,12 +13,25 @@ import (
 var (
 	ErrNoData   = errors.New("no new data available")
 	readTimeout = (time.Second / 60) * 5 // N missed frames at 60fps
+	packetPool  = sync.Pool{
+		New: func() any {
+			var b packetBuffer
+			return &b
+		},
+	}
 )
+
+type packetBuffer [unsafe.Sizeof(Outgauge{})]byte
+
+type frame struct {
+	Buf *packetBuffer
+	Len int
+}
 
 type UDPTransport struct {
 	address    *net.UDPAddr
 	connection *net.UDPConn
-	dataChan   chan []byte
+	dataChan   chan frame
 }
 
 func NewUDPReader(ip string, port int) (*UDPTransport, error) {
@@ -35,7 +49,7 @@ func NewUDPReader(ip string, port int) (*UDPTransport, error) {
 	udpT := UDPTransport{
 		address:    addr,
 		connection: conn,
-		dataChan:   make(chan []byte, 1),
+		dataChan:   make(chan frame, 1),
 	}
 
 	go udpT.udpSink()
@@ -69,17 +83,28 @@ func (ut *UDPTransport) udpSink() {
 	for {
 		ut.connection.SetReadDeadline(time.Now().Add(readTimeout))
 
-		buf := make([]byte, unsafe.Sizeof(Outgauge{}))
-		nBytes, _, err := ut.connection.ReadFromUDP(buf)
+		bufPtr := packetPool.Get().(*packetBuffer)
+
+		nBytes, _, err := ut.connection.ReadFromUDP(bufPtr[:])
 		if err != nil {
 			return
 		}
 
+		frame := frame{
+			Buf: bufPtr,
+			Len: nBytes,
+		}
+
 		select {
-		case ut.dataChan <- buf[:nBytes]:
+		case ut.dataChan <- frame:
+			// Packet sent successfuly
 		default:
-			<-ut.dataChan
-			ut.dataChan <- buf[:nBytes]
+			select {
+			case oldFrame := <-ut.dataChan:
+				packetPool.Put(oldFrame.Buf)
+			default:
+			}
+			ut.dataChan <- frame
 		}
 	}
 }
@@ -89,13 +114,16 @@ func (ut *UDPTransport) Write(data []byte) (int, error) {
 }
 
 func (ut *UDPTransport) Read(buffer []byte) (int, error) {
-	data, ok := <-ut.dataChan
+	latestFrame, ok := <-ut.dataChan
 	if !ok {
 		slog.Error(ErrNoData.Error())
 		return 0, ErrNoData
 	}
 
-	return copy(buffer, data), nil
+	nBytes := copy(buffer, latestFrame.Buf[:latestFrame.Len])
+	packetPool.Put(latestFrame.Buf)
+
+	return nBytes, nil
 }
 
 func (ut *UDPTransport) Close() error {

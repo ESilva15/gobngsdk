@@ -3,35 +3,51 @@ package bngsdk
 import (
 	"bytes"
 	"encoding/binary"
+	"io"
+	"log/slog"
 	"net"
 	"testing"
 )
 
-func BenchmarkReadData(b *testing.B) {
-	// Spin up an UDP server
-	sdk, err := Init("127.0.0.1", 0)
+func BenchmarkUpdate(b *testing.B) {
+	// Silence logging output so slog calls don't pollute benchmark stats
+	slogger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	// Initialize the SDK with port 0 to bind to an OS-assigned ephemeral port
+	sdk, err := NewBngSDK(Options{
+		Logger:           slogger,
+		SourceType:       UDPData,
+		ImportUDPAddress: "127.0.0.1",
+		ImportUDPPort:    0,
+	})
 	if err != nil {
 		b.Fatalf("Failed to initialize SDK: %v", err)
 	}
 	defer sdk.Close()
 
-	// Retrieve the actual assigned UDP address
-	localAddr := sdk.Conn.LocalAddr().(*net.UDPAddr)
+	// Access the underlying reader connection to determine the dynamically bound port
+	ogReader, ok := sdk.reader.(*OgUDPReader)
+	if !ok || ogReader.udpConnection == nil || ogReader.udpConnection.connection == nil {
+		b.Fatalf("Failed to retrieve underlying UDP connection")
+	}
 
-	// Start a client to stream data
-	clientConn, err := net.DialUDP("udp", nil, localAddr)
+	serverAddr := ogReader.udpConnection.connection.LocalAddr().(*net.UDPAddr)
+
+	// Dial the UDP socket as a client to send test data
+	clientConn, err := net.DialUDP("udp", nil, serverAddr)
 	if err != nil {
-		b.Fatalf("Failed to dial local UDP socket: %v", err)
+		b.Fatalf("Failed to dial UDP server: %v", err)
 	}
 	defer clientConn.Close()
 
-	// Pre serialize some data
+	// Pre-serialize a dummy Outgauge struct matching the required byte layout
 	dummyOutgauge := Outgauge{
 		Time:  424242,
 		Car:   [4]byte{'P', 'E', 'R', 'F'},
 		Speed: 45.2,
 		RPM:   3500.0,
 	}
+
 	var buf bytes.Buffer
 	if err := binary.Write(&buf, binary.LittleEndian, dummyOutgauge); err != nil {
 		b.Fatalf("Failed to serialize dummy struct: %v", err)
@@ -42,16 +58,16 @@ func BenchmarkReadData(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		// Feed a packet into the network buffer right before reading it
+		// Feed a packet into the network transport socket
 		_, err := clientConn.Write(packetBytes)
 		if err != nil {
 			b.Fatalf("Failed to write to UDP socket: %v", err)
 		}
 
-		// Execute the target function
-		err = sdk.ReadData()
+		// Run the main API loop method
+		_, err = sdk.Update()
 		if err != nil {
-			b.Fatalf("ReadData failed at iteration %d: %v", i, err)
+			b.Fatalf("Update failed at iteration %d: %v", i, err)
 		}
 	}
 }
