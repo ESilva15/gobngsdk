@@ -27,3 +27,7 @@ func (sw *SocketWriter) Write(data []byte) (int, error) {
 	// slog.Debug("Writing", "data", data)
 	return sw.udpConnection.Write(data)
 }
+
+func (sw *SocketWriter) GetTotalWritten() int64 {
+	return sw.udpConnection.totalBytes
+}

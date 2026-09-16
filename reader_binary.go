@@ -6,10 +6,15 @@ import (
 	"unsafe"
 )
 
+type Sizer interface {
+	Size() int64
+}
+
 type GobReader struct {
 	TotalRead int64
 	File      *os.File
 	Buf       []byte
+	size      int64
 }
 
 func NewOgBinReader(fp string) *GobReader {
@@ -18,10 +23,16 @@ func NewOgBinReader(fp string) *GobReader {
 		return nil
 	}
 
+	info, err := bin.Stat()
+	if err != nil {
+		return nil
+	}
+
 	return &GobReader{
 		TotalRead: 0,
 		File:      bin,
 		Buf:       make([]byte, unsafe.Sizeof(Outgauge{})),
+		size:      info.Size(),
 	}
 }
 
@@ -54,4 +65,12 @@ func (g *GobReader) Next(buffer []byte) (int, error) {
 	g.TotalRead = pos
 
 	return nBytes, nil
+}
+
+func (g *GobReader) GetTotalRead() int64 {
+	return g.TotalRead
+}
+
+func (g *GobReader) Size() int64 {
+	return g.size
 }

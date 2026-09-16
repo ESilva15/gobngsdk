@@ -3,6 +3,7 @@ package bngsdk
 type BngImporter interface {
 	Reset() error
 	Next([]byte) (int, error)
+	GetTotalRead() int64
 	Close() error
 }
 

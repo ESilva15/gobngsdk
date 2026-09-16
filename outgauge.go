@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	outgaugeSize     = binary.Size(Outgauge{})
+	OutgaugeSize     = int64(binary.Size(Outgauge{}))
 	ErrNotEnoughData = errors.New("buffer len is too short for Outgauge unpacking")
 )
 
@@ -64,7 +64,7 @@ type Outgauge struct {
 }
 
 func (og *Outgauge) ParseData(buffer []byte) error {
-	if len(buffer) < outgaugeSize {
+	if int64(len(buffer)) < OutgaugeSize {
 		return ErrNotEnoughData
 	}
 
@@ -171,6 +171,11 @@ func (og *Outgauge) ABS() bool {
 	return og.ShowLights&DL_ABS != 0
 }
 
+// Spare reports whether spare was flipped
+func (og *Outgauge) Spare() bool {
+	return og.ShowLights&DL_SPARE != 0
+}
+
 // ShowLights - functions to check if a given dash light is on [END]
 
 // DashLights - functions to check if a given dash light is provided [START]
@@ -229,6 +234,11 @@ func (og *Outgauge) HasBatteryLight() bool {
 // HasABSLight reports whether an ABS light is available
 func (og *Outgauge) HasABSLight() bool {
 	return og.DashLights&DL_ABS != 0
+}
+
+// HasSpare reports whether spare was flipped
+func (og *Outgauge) HasSpare() bool {
+	return og.DashLights&DL_SPARE != 0
 }
 
 // DashLights - functions to check if a given dash light is provided [END]

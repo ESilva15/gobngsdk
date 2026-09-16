@@ -32,6 +32,7 @@ type UDPTransport struct {
 	address    *net.UDPAddr
 	connection *net.UDPConn
 	dataChan   chan frame
+	totalBytes int64 // returns total bytes read in case of reader and written in case of writer
 }
 
 func NewUDPReader(ip string, port int) (*UDPTransport, error) {
@@ -110,7 +111,11 @@ func (ut *UDPTransport) udpSink() {
 }
 
 func (ut *UDPTransport) Write(data []byte) (int, error) {
-	return ut.connection.Write(data)
+	nBytes, err := ut.connection.Write(data)
+
+	ut.totalBytes += int64(nBytes)
+
+	return nBytes, err
 }
 
 func (ut *UDPTransport) Read(buffer []byte) (int, error) {
@@ -123,6 +128,8 @@ func (ut *UDPTransport) Read(buffer []byte) (int, error) {
 	nBytes := copy(buffer, latestFrame.Buf[:latestFrame.Len])
 	packetPool.Put(latestFrame.Buf)
 
+	ut.totalBytes += int64(nBytes)
+
 	return nBytes, nil
 }
 
@@ -132,4 +139,8 @@ func (ut *UDPTransport) Close() error {
 	}
 
 	return nil
+}
+
+func (ut *UDPTransport) GetTotalBytes() int64 {
+	return ut.totalBytes
 }

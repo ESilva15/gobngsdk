@@ -41,9 +41,13 @@ func (ogr *OgUDPReader) Next(buffer []byte) (int, error) {
 	}
 
 	// Check if enough data was received to fill our struct
-	if nBytes != outgaugeSize {
+	if int64(nBytes) != OutgaugeSize {
 		return 0, ErrInvalidOutgaugeData
 	}
 
 	return nBytes, nil
+}
+
+func (ogr *OgUDPReader) GetTotalRead() int64 {
+	return ogr.udpConnection.GetTotalBytes()
 }

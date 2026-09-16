@@ -2,6 +2,7 @@ package bngsdk
 
 type BngExporter interface {
 	Write([]byte) (int, error)
+	GetTotalWritten() int64
 	Close() error
 }
 

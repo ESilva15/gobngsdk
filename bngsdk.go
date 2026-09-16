@@ -47,7 +47,7 @@ type BeamNGSDK struct {
 func NewBngSDK(opts Options) (*BeamNGSDK, error) {
 	sdk := BeamNGSDK{
 		Opts:   opts,
-		buffer: make([]byte, outgaugeSize),
+		buffer: make([]byte, OutgaugeSize),
 	}
 
 	var err error
@@ -184,6 +184,22 @@ func (sdk *BeamNGSDK) Update() (*Outgauge, error) {
 	return &sdk.data, sdk.parseData(sdk.buffer)
 }
 
+func (sdk *BeamNGSDK) GetTotalRead() int64 {
+	return sdk.reader.GetTotalRead()
+}
+
+func (sdk *BeamNGSDK) GetTotalWritten() int64 {
+	return sdk.writer.GetTotalWritten()
+}
+
 func (sdk *BeamNGSDK) parseData(buffer []byte) error {
 	return sdk.data.ParseData(buffer)
+}
+
+func (sdk *BeamNGSDK) GetSourceSize() int64 {
+	if sizer, ok := sdk.reader.(Sizer); ok {
+		return sizer.Size()
+	}
+
+	return 0
 }

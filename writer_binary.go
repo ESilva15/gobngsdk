@@ -6,7 +6,8 @@ import (
 )
 
 type OgBinWriter struct {
-	file *os.File
+	file       *os.File
+	totalBytes int64
 }
 
 func NewOgBinWriter(path string) (*OgBinWriter, error) {
@@ -34,5 +35,12 @@ func (ogw *OgBinWriter) Write(data []byte) (int, error) {
 		return 0, err
 	}
 
-	return len(data), nil
+	nBytes := len(data)
+	ogw.totalBytes += int64(nBytes)
+
+	return nBytes, nil
+}
+
+func (ogw *OgBinWriter) GetTotalWritten() int64 {
+	return ogw.totalBytes
 }
