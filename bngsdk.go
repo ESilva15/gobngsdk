@@ -303,7 +303,7 @@ func (sdk *BeamNGSDK) HasHandbrakeLight() bool {
 // HasPitspeed reports whether a pit speed limitr is available
 // NOTE: this may not be used in BeamNG.drive, haven't checked yet
 func (sdk *BeamNGSDK) HasPitspeed() bool {
-	return sdk.Data.DashLights&DL_HANDBRAKE != 0
+	return sdk.Data.DashLights&DL_PITSPEED != 0
 }
 
 // HasTractionControlLight reports whether a traction control light is available
