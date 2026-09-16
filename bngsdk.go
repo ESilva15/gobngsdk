@@ -40,7 +40,7 @@ type BeamNGSDK struct {
 	Opts   Options
 	reader BngImporter
 	writer BngExporter
-	Data   Outgauge
+	data   Outgauge
 	buffer []byte
 }
 
@@ -181,9 +181,9 @@ func (sdk *BeamNGSDK) Update() (*Outgauge, error) {
 		sdk.writer.Write(sdk.buffer)
 	}
 
-	return &sdk.Data, sdk.parseData(sdk.buffer)
+	return &sdk.data, sdk.parseData(sdk.buffer)
 }
 
 func (sdk *BeamNGSDK) parseData(buffer []byte) error {
-	return sdk.Data.ParseData(buffer)
+	return sdk.data.ParseData(buffer)
 }

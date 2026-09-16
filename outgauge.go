@@ -261,26 +261,26 @@ func (og *Outgauge) PrefersBAR() bool {
 // ToMap creates a map with the data in the Outgauge struct
 func (sdk *BeamNGSDK) ToMap() map[string]any {
 	return map[string]any{
-		"Time":        sdk.Data.Time,        // time in milliseconds (to check order)
-		"Car":         sdk.Data.Car,         // Car name
-		"Flags":       sdk.Data.Flags,       // Info (see OG_x below)
-		"Gear":        sdk.Data.Gear,        // Reverse:0, Neutral:1, First:2...
-		"Plid":        sdk.Data.Plid,        // Unique ID of viewed player (0 = none)
-		"Speed":       sdk.Data.Speed,       // M/S
-		"RPM":         sdk.Data.RPM,         // RPM
-		"Turbo":       sdk.Data.Turbo,       // BAR
-		"EngTemp":     sdk.Data.EngTemp,     // C
-		"Fuel":        sdk.Data.Fuel,        // 0 to 1
-		"OilPressure": sdk.Data.OilPressure, // BAR
-		"OilTemp":     sdk.Data.OilTemp,     // C
-		"DashLights":  sdk.Data.DashLights,  // Dash lights available (see DL_x below)
-		"ShowLights":  sdk.Data.ShowLights,  // Dash lights currently switched on
-		"Throttle":    sdk.Data.Throttle,    // 0 to 1
-		"Brake":       sdk.Data.Brake,       // 0 to 1
-		"Clutch":      sdk.Data.Clutch,      // 0 to 1
-		"Display1":    sdk.Data.Display1,    // Usually Fuel
-		"Display2":    sdk.Data.Display2,    // Usually Settings
-		"ID":          sdk.Data.ID,          // optional - only if OutGauge ID is specified
+		"Time":        sdk.data.Time,        // time in milliseconds (to check order)
+		"Car":         sdk.data.Car,         // Car name
+		"Flags":       sdk.data.Flags,       // Info (see OG_x below)
+		"Gear":        sdk.data.Gear,        // Reverse:0, Neutral:1, First:2...
+		"Plid":        sdk.data.Plid,        // Unique ID of viewed player (0 = none)
+		"Speed":       sdk.data.Speed,       // M/S
+		"RPM":         sdk.data.RPM,         // RPM
+		"Turbo":       sdk.data.Turbo,       // BAR
+		"EngTemp":     sdk.data.EngTemp,     // C
+		"Fuel":        sdk.data.Fuel,        // 0 to 1
+		"OilPressure": sdk.data.OilPressure, // BAR
+		"OilTemp":     sdk.data.OilTemp,     // C
+		"DashLights":  sdk.data.DashLights,  // Dash lights available (see DL_x below)
+		"ShowLights":  sdk.data.ShowLights,  // Dash lights currently switched on
+		"Throttle":    sdk.data.Throttle,    // 0 to 1
+		"Brake":       sdk.data.Brake,       // 0 to 1
+		"Clutch":      sdk.data.Clutch,      // 0 to 1
+		"Display1":    sdk.data.Display1,    // Usually Fuel
+		"Display2":    sdk.data.Display2,    // Usually Settings
+		"ID":          sdk.data.ID,          // optional - only if OutGauge ID is specified
 	}
 }
 
